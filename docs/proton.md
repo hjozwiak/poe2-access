@@ -3,8 +3,8 @@
 Speech under Wine or Proton, as the sister mods do it (the D2R mod's
 [issue #5](https://github.com/Ali-Bueno/d2r-access/issues/5) and
 [PR #6](https://github.com/Ali-Bueno/d2r-access/pull/6), its releases 1.0.11 and 1.0.12: heard there under Proton
-Experimental on Arch with Cthulhu). Built and checked on Windows on 2026-11-08 and 2026-11-09; **not yet run under
-Proton or on a Steam Deck**. The rest of the mod is untested there too: it reads the
+Experimental on Arch with Cthulhu). Built and checked on Windows on 2026-11-08 and 2026-11-09; the speech start
+checked under Wine on Arch 2026-11-10 (below); **not yet run in game under Proton or on a Steam Deck**. The rest of the mod is untested there too: it reads the
 game's memory from its own process (`ReadProcessMemory` on the game's process, in the same Wine prefix), and whether
 Wine allows that, and finds the game's window and modules as on Windows, is **unverified**.
 
@@ -28,11 +28,24 @@ With the bridges missing, PRISM is not silent but **mute**: `acquire_best` takes
 over eSpeak-NG, which reports a voice while the Steam runtime carries no eSpeak-NG data, so nothing sounds and nothing
 fails. At 0.18.3 SAPI, UIA and Speech Dispatcher share priority 97 (NVDA 103, Orca 100, OneCore 98, Spiel 96) and SAPI
 comes first, so it wins whenever Orca is missing (the D2R mod's tester, 2026-11-09). Under Wine the binding therefore
-never calls `acquire_best`: `PrismLibrary.StartBridged` tries only Orca, Speech Dispatcher and Spiel, by priority, each
-checked with `prism_registry_get` and `PRISM_BACKEND_IS_SUPPORTED_AT_RUNTIME` before `prism_registry_acquire`
-(`ALREADY_INITIALIZED` counts as started), and when none starts it says why for each. It also sends PRISM's own log to
-the mod's log at debug level while it starts (`prism_set_log_handler`), the only place PRISM says why a bridge did not
-load, then lowers it to warnings. On Windows none of this runs: `acquire_best`, NVDA first, no PRISM log.
+never calls `acquire_best`: `PrismLibrary.StartBridged` tries only Orca, Speech Dispatcher and Spiel, by priority,
+each with `prism_registry_acquire` and the `PRISM_BACKEND_IS_SUPPORTED_AT_RUNTIME` check on the acquired backend,
+freed on failure (`ALREADY_INITIALIZED` counts as started), and when none starts it says why for each. It also sends
+PRISM's own log to the mod's log at debug level while it starts (`prism_set_log_handler`), the only place PRISM says
+why a bridge did not load, then lowers it to warnings. On Windows none of this runs: `acquire_best`, NVDA first, no
+PRISM log.
+
+The acquire must come first — it is the probe. As first shipped (from the D2R mod's selection of the same morning),
+each candidate was probed with `prism_registry_get` before acquiring; under Proton every bridge then read
+"unavailable" and no bridge ever loaded, with `WINEDLLPATH` verified correct (the D2R mod's 1.0.12, silent the same
+way). In PRISM 0.18.3 `FrozenRegistry::get` only returns a backend something has already acquired — only
+`prism_registry_acquire` runs the factory that loads the bridge DLL — so that probe could never succeed. Fixed in
+the D2R mod 2026-11-09 (`dbc0356`; harness under Wine, then `PRISM ready, backend: Orca` in game) and ported here
+2026-11-10. Proven here the same day outside the game: the tests' `prism` command published for win-x64 and run
+under Wine 11.21 (Arch, Cthulhu running, the shipped `prism.dll`, `WINEDLLPATH` at `third_party/prism/runtime/wine`)
+— with the old probe, `Orca unavailable; Speech Dispatcher unavailable; Spiel unavailable`; with the fix, backend
+Orca, both rounds' lines sent (`speak: ok`), `prism_orca_bridge.dll` loaded. An in-game run under Proton here is
+still outstanding.
 
 ## What ships
 

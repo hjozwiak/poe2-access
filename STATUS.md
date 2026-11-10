@@ -21,7 +21,9 @@
   and `wine/*.dll.so`; under Proton the `wine/` folder must be on `WINEDLLPATH`, which Steam's launch option
   `sh "<mod>/poe2access-proton.sh" %command%` sets before it runs `Poe2Access.exe` under the game's `proton`, and under
   Wine only Orca, Speech Dispatcher or Spiel is taken, never SAPI (mute there; `PrismLibrary.StartBridged`, 2026-11-09,
-  from the D2R mod's Proton test; [Proton](docs/proton.md), untested here). Windows
+  from the D2R mod's Proton test; its acquire-first fix — `prism_registry_get` never loads a bridge, so the probe
+  as first shipped could only fail — ported 2026-11-10 and proven under Wine outside the game the same day
+  (backend Orca on Cthulhu, [Proton](docs/proton.md)); in-game under Proton still untested here). Windows
   check 2026-11-08 (`dotnet run --project tests/Poe2Accessibility.Tests -c Release -- prism <plugin folder>`): NVDA picked,
   the line sent (PRISM_OK), no bridge loaded; Orca, Speech Dispatcher and Spiel now in the registry.
 - **Plugin:** `Poe2Accessibility/` (sealed `Poe2AccessibilityCore : PCore<AccessibilitySettings>`).

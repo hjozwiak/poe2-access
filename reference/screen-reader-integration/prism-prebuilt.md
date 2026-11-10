@@ -54,8 +54,11 @@
   `WINEDLLPATH` and execs the game's `proton` directly. Without the bridges, `acquire_best` takes Wine's SAPI
   (Proton's `protontts`), which reports a voice but is **mute** because the Steam runtime has no eSpeak-NG data;
   and SAPI, UIA and Speech Dispatcher share priority 97, so SAPI wins whenever Orca (100) is missing. Under
-  Wine, walk the registry instead (`prism_registry_get` + `IS_SUPPORTED_AT_RUNTIME`, then
-  `prism_registry_acquire`) and accept only Orca, Speech Dispatcher and Spiel; forward PRISM's log
+  Wine, walk the registry instead: `prism_registry_acquire` first — the acquire is the probe, since it runs the
+  factory that loads the bridge, while `prism_registry_get` only returns a backend already acquired (probing
+  with it first left every bridge "unavailable"; the D2R mod's 1.0.12, fixed 2026-11-09) — then
+  `IS_SUPPORTED_AT_RUNTIME` on the acquired backend, freed on failure, accepting only Orca, Speech Dispatcher
+  and Spiel; forward PRISM's log
   (`prism_set_log_handler`, level debug under Wine) to see why a bridge did not load. Orca/Cthulhu is the
   verified route; `libspeechd.so.2` is absent inside SteamLinuxRuntime_4. A mod that runs in its own process
   (the PoE2 mod) does the same: the script runs the mod's launcher under that `proton`, and the launcher starts

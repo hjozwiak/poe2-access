@@ -68,7 +68,6 @@ namespace Poe2Accessibility.Services
         private readonly delegate* unmanaged[Cdecl]<IntPtr, byte*, byte, int> backendSpeak;
         private readonly delegate* unmanaged[Cdecl]<IntPtr, int> backendStop;
         private readonly delegate* unmanaged[Cdecl]<int, byte*> errorString;
-        private readonly delegate* unmanaged[Cdecl]<IntPtr, ulong, IntPtr> registryGet;
         private readonly delegate* unmanaged[Cdecl]<IntPtr, ulong, IntPtr> registryAcquire;
         private readonly delegate* unmanaged[Cdecl]<IntPtr, ulong> backendGetFeatures;
         private readonly delegate* unmanaged[Cdecl]<LogHandler, LogHandler> setLogHandler;
@@ -94,7 +93,6 @@ namespace Poe2Accessibility.Services
             this.backendSpeak = (delegate* unmanaged[Cdecl]<IntPtr, byte*, byte, int>)this.Export("prism_backend_speak");
             this.backendStop = (delegate* unmanaged[Cdecl]<IntPtr, int>)this.Export("prism_backend_stop");
             this.errorString = (delegate* unmanaged[Cdecl]<int, byte*>)this.Export("prism_error_string");
-            this.registryGet = (delegate* unmanaged[Cdecl]<IntPtr, ulong, IntPtr>)this.Export("prism_registry_get");
             this.registryAcquire = (delegate* unmanaged[Cdecl]<IntPtr, ulong, IntPtr>)this.Export("prism_registry_acquire");
             this.backendGetFeatures = (delegate* unmanaged[Cdecl]<IntPtr, ulong>)this.Export("prism_backend_get_features");
             this.setLogHandler = (delegate* unmanaged[Cdecl]<LogHandler, LogHandler>)this.Export("prism_set_log_handler");
@@ -214,7 +212,10 @@ namespace Poe2Accessibility.Services
 
         /// <summary>
         ///     Under Wine: the first bridged backend that is supported here and starts (<see cref="WineCandidates"/>); null when
-        ///     one speaks, else why none did, each candidate's reason included.
+        ///     one speaks, else why none did, each candidate's reason included. The acquire is the probe: it runs the
+        ///     backend's factory, which loads the Wine bridge, while prism_registry_get only returns a backend something
+        ///     already acquired — probing with it first left every bridge "unavailable" and unloaded (the D2R mod's
+        ///     1.0.12 under Proton, fixed there 2026-11-09; docs/proton.md).
         /// </summary>
         private string? StartBridged()
         {
@@ -223,23 +224,17 @@ namespace Poe2Accessibility.Services
             foreach (var id in WineCandidates(registered.Select(entry => (entry.Id, entry.Priority))))
             {
                 var name = registered.First(entry => entry.Id == id).Name;
-                var shared = this.registryGet(this.context, id); // the shared instance: probed, never freed
-                if (shared == IntPtr.Zero)
+                var acquired = this.registryAcquire(this.context, id);
+                if (acquired == IntPtr.Zero)
                 {
                     reasons.Add($"{name} unavailable");
                     continue;
                 }
 
-                if ((this.backendGetFeatures(shared) & SupportedAtRuntime) == 0)
+                if ((this.backendGetFeatures(acquired) & SupportedAtRuntime) == 0)
                 {
                     reasons.Add($"{name} not supported here");
-                    continue;
-                }
-
-                var acquired = this.registryAcquire(this.context, id);
-                if (acquired == IntPtr.Zero)
-                {
-                    reasons.Add($"{name} not acquired");
+                    this.backendFree(acquired);
                     continue;
                 }
 
